@@ -1,177 +1,161 @@
+import json
 import time
-from thread import *
-from payload.dfs import *
-from engine.events import *
-from Wrappers.uniswap import Uniswap
+import signal
+import random
+import traceback
+from web3 import Web3
+from decimal import Decimal
+from optparse import OptionParser
+from typing import List, Dict, Union
 
-all_pairs = json.load(open('files/pairs.json'))
+from payload.dfs import findArb
+from core.liquidity import Liquidity
+from settings.settings import maxHops, startToken
+from settings.settings import minProfit
+from settings.settings import ethereum_http
+from settings.settings import programStatus
+from settings.settings import timer
+from settings.settings import slidePoint
+from settings.settings import gasPrice
+from settings.settings import address_router_contract
+from settings.settings import address_tx_sender
+from settings.settings import reserveMinAmount
+from settings.settings import dfsUsePairNum
 
-pairs, pairsDict = selectPairs(all_pairs)
+from utilities.tokens import getWhiteTokens
+from utilities.pairs import getAllPairInfo
+from utilities.log_builder import logger
+from utilities.abi.uniswap_router import abi as router_abi
+from core.contract_fun import estimateGas
+
+class JsonCustomEncoder(json.JSONEncoder):
+    def default(self, field):
+        if isinstance(field, Decimal):
+            return str(field)
+        else:
+            return json.JSONEncoder.default(self, field)
+
+def randSelect(pairs:List, num:Union[int, None]=None)->List:
+    if num is None:
+        return pairs
+
+    maxNum = len(pairs)
+    start = random.randint(0, maxNum-num)
+    return pairs[start:start+num]
+
+def sigint_handler(signum, frame):
+    programStatus.setRuning(False)
+
+signal.signal(signal.SIGINT, sigint_handler)
+signal.signal(signal.SIGHUP, sigint_handler)
+signal.signal(signal.SIGTERM, sigint_handler)
+
 tokenIn = startToken
 tokenOut = tokenIn
-startToken = tokenIn
-currentPairs = []
-path = [tokenIn]
-bestTrades = []
 
-def printMoney(amountIn, p, gasPrice, profit):
-    deadline = int(time.time()) + 600
-    tx = printer.functions.printMoney(startToken['address'], amountIn, amountIn, p, deadline).buildTransaction({
-        'from': address,
-        'value': 0,
-        'gasPrice': gasPrice,
-        'gas': 1500000,
-        "nonce": w3.eth.getTransactionCount(address),
-        })
-    try:
-        gasEstimate = w3.eth.estimateGas(tx)
-        print('estimate gas cost:', gasEstimate*gasPrice/1e18)
-    except Exception as e:
-        print('gas estimate err:', e)
-        return None
-    if config['start'] == 'usdt' or config['start'] == 'usdc' or config['start'] == 'dai':
-        if gasEstimate * gasPrice / 1e18 * 360 >= profit/pow(10, startToken['decimal']):
-            print('gas too much, give up...')
-            return None
-    if config['start'] == 'weth' and gasEstimate * gasPrice >= profit:
-        print('gas too much, give up...')
-        return None
-    signed_tx = w3.eth.account.sign_transaction(tx, private_key=privkey)
-    try:
-        txhash = w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        return txhash.hex()
-    except:
-        return None
+tmr = timer()
 
-def flashPrintMoney(amountIn, p, gasPrice, profit):
-    tx = printer.functions.flashPrintMoney(startToken['address'], amountIn, p).buildTransaction({
-        'from': address,
-        'value': 0,
-        'gasPrice': gasPrice,
-        'gas': 1500000,
-        "nonce": w3.eth.getTransactionCount(address),
-        })
-    try:
-        gasEstimate = w3.eth.estimateGas(tx)
-        print('estimate gas cost:', gasEstimate*gasPrice/1e18)
-    except Exception as e:
-        print('gas estimate err:', e)
-        return None
-    if config['start'] == 'usdt' or config['start'] == 'usdc' or config['start'] == 'dai':
-        if gasEstimate * gasPrice / 1e18 * 360 >= profit/pow(10, startToken['decimal']):
-            print('gas too much, give up...')
-            return None
-    if config['start'] == 'weth' and gasEstimate * gasPrice >= profit:
-        print('gas too much, give up...')
-        return None
-    signed_tx = w3.eth.account.sign_transaction(tx, private_key=privkey)
-    try:
-        txhash = w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        return txhash.hex()
-    except:
-        return None
+web3_ins = Web3(Web3.HTTPProvider(ethereum_http))
+def main(pairs:List[Dict])->None:
+    pairs = randSelect(pairs, dfsUsePairNum)
+    logger.info(f"pairs num_use: {len(pairs)}")
 
-def doTrade(balance, trade):
-    p = [t['address'] for t in trade['path']]
-    amountIn = int(trade['optimalAmount'])
-    useFlash = False
-    if amountIn > balance:
-        useFlash = True
-    minOut = int(amountIn)
-    to = config['address']
-    deadline = int(time.time()) + 600
-    print(amountIn, minOut, p, to, deadline)
-    try:
-        # amountsOut = uni.get_amounts_out(amountIn, p)
-        amountsOut = [int(trade['outputAmount'])]
-        print('amountsOut', amountsOut)
-    except Exception as e:
-        print('there is a fucking exception!')
-        print(e)
-        return
-    if amountsOut[-1] > amountIn:
-        gasPrice = int(gasnow()['rapid']*1.2)
-        # uni.set_gas(int(gasnow()['rapid']*1.1))
-        # txhash = uni.swap_exact_tokens_for_tokens(amountIn, minOut, p, to, deadline)
-        # approve(startToken['address'], printer_addr, address, amountIn, gasPrice)
-        # txhash = doTradeSwap(amountIn, p, deadline, gasPrice)
-        if useFlash:
-            txhash = flashPrintMoney(amountIn, p, gasPrice, amountsOut[-1]-amountIn)
-        else:
-            txhash = printMoney(amountIn, p, gasPrice, amountsOut[-1]-amountIn)
-        return txhash
-    return None
+    next(tmr)
+    currentPairs = []
+    path = [tokenIn]
+    bestTrades = []
+    trades = findArb(
+            pairs=pairs,
+            tokenIn=tokenIn,
+            tokenOut=tokenOut,
+            maxHops=maxHops,
+            currentPairs=currentPairs,
+            path=path,
+            bestTrades=bestTrades,
+            programStatus=programStatus,
+            count=10,
+            )
 
-needChangeKey = False
-def get_reserves_batch_mt(pairs):
-    global needChangeKey
-    if len(pairs) <= 200:
-        new_pairs = get_reserves(pairs)
-    else:
-        s = 0
-        threads = []
-        while s < len(pairs):
-            e = s + 200
-            if e > len(pairs):
-                e = len(pairs)
-            t = MyThread(func=get_reserves, args=(pairs[s:e],))
-            t.start()
-            threads.append(t)
-            s = e
-        new_pairs = []
-        for t in threads:
-            t.join()
-            ret = t.get_result()
-            if not ret:
-                needChangeKey = True
-            new_pairs.extend(ret)
-    return new_pairs
+    logger.info(f"dfs time_use: {next(tmr)}")
+    for trade in trades:
+        amountsOut = trade["amountsOut"]
+        # in/out
+        amount_in = amountsOut[0]
+        amount_out = amountsOut[-1]
 
-last_key = 0
-def main():
-    global pairs, pairsDict, uni, w3, printer, last_key, needChangeKey
-    if config['pairs'] == 'random':
-        pairs, pairsDict = selectPairs(all_pairs)
-    start = time.time()
-    print('pairs:', len(pairs))
-    try:
-        # pairs = get_reserves(pairs)
-        pairs = get_reserves_batch_mt(pairs)
-        if needChangeKey:
-            needChangeKey = False
-            l = len(config['https'])
-            http_addr = config['https'][(last_key+1)%l]
-            last_key += 1
-            last_key %= l
-            uni = Uniswap(address, privkey, http_addr)
-            w3 = Web3(HTTPProvider(http_addr, request_kwargs={'timeout': 6000}))
-            printer = w3.eth.contract(address=printer_addr, abi=printer_abi)
-            print('key changed:', http_addr)
+        logger.info(f"--- path0: {trade['path'][0]['symbol']} path-1: {trade['path'][-1]['symbol']}")
+
+        amount_out_slide_point = int(amount_out*(1-slidePoint))
+
+        # min profit
+        profit_slide_point = amount_out_slide_point - amount_in
+
+        # swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline)
+        # exactAmountIn, amountOutMin
+        fun_args = {
+                "amountIn":amount_in,
+                "amountOutMin":amount_out_slide_point,
+                "path":[p["address"] for p in trade["path"]],
+                "to": f"'{address_tx_sender}'",
+                "deadline":int(time.time()+100),
+                }
+        fun_with_args = "swapExactTokensForTokensSupportingFeeOnTransferTokens({amountIn}, {amountOutMin}, {path}, {to}, {deadline})".format(**fun_args)
+        tx_args = {
+                "from": address_tx_sender
+                }
+        try:
+            gas = estimateGas(
+                    web3_ins=web3_ins,
+                    fun_with_args=fun_with_args,
+                    tx_args=tx_args,
+                    contract_abi=router_abi.abi(),
+                    contract_address=address_router_contract)
+
+            logger.info(f"gasUsed: {gas}")
+        except:
+            logger.error(f"fun estimateGas get exception:{traceback.format_exc()}")
             return
-    except Exception as e:
-        print('get_reserves err:', e)
-        # raise
-        return
-    end = time.time()
-    print('update cost:', end - start, 's')
-    trades = findArb(pairs, tokenIn, tokenOut, maxHops, currentPairs, path, bestTrades)
-    if len(trades) == 0:
-        return
-    print('max_profit:', trades[0]['p'])
-    end1 = time.time()
-    print('dfs cost:', end1 - end, 's, update+dfs cost:', end1 - start, 's')
-    balance = getBalance(startToken['address'], config['address'])
-    print('balance:', balance)
-    trade = trades[0]
-    if trade and int(trade['profit'])/pow(10, startToken['decimal']) >= minProfit:
-        print(trade)
-        tx = doTrade(balance, trade)
-        print('tx:', tx)
+
+        gas_fee = gasPrice*gas
+
+        logger.info(f"gasFee: {gas_fee/pow(10,18)} Eth")
+        logger.info(f"theoryProfit: {trade['profit']/pow(10,18)} Eth")
+        logger.info(f"profitSlidePoint: {profit_slide_point/pow(10,18)} Eth")
+        profit_fee_on = int(profit_slide_point-gas_fee)/pow(10, startToken['decimal'])
+        tag = "Insufficient"
+        if profit_fee_on >= minProfit:
+            tag = "Satisfy"
+            logger.info(json.dumps(trade, cls=JsonCustomEncoder))
+        logger.info(f"---- {tag} ProfitFeeOn ----: {profit_fee_on} Eth")
+
+        break
 
 if __name__ == "__main__":
-    while 1:
-        try:
-            main()
-        except Exception as e:
-            print('exception:', e)
-            raise
+    usage = "usage: python3 main.py [options] arg"
+    parser = OptionParser(usage=usage,description="command descibe")
+    parser.add_option("--redownload_tokens", action='store_true', dest="redownload_tokens", default=False, help="redownload tokens")
+    parser.add_option("--redownload_pairs_address", action='store_true', dest="redownload_pairs_address", default=False, help="redownload pairs address")
+    parser.add_option("--redownload_pairs_info", action='store_true', dest="redownload_pairs_info", default=False, help="redownload pairs info")
+
+    (options, args) = parser.parse_args()
+
+    white_tokens = getWhiteTokens(redownload=options.redownload_tokens)
+    all_pair_info = getAllPairInfo(
+            eth_http=ethereum_http,
+            redownload_pairinfo=options.redownload_pairs_info,
+            redownload_pairaddress=options.redownload_pairs_address,
+            programStatus=programStatus,
+            )
+
+    t = Liquidity(
+            eth_http=ethereum_http,
+            pairs=all_pair_info,
+            white_tokens=white_tokens,
+            reserve_min_amount=reserveMinAmount,
+            fallback_fun=main,
+            )
+    t.start()
+    t.join()
+
+    logger.info("---- exit ----")
+
