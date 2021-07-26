@@ -87,8 +87,7 @@ def rpc_response_to_result(response:Dict):
         error_message = 'result is None in response {}.'.format(response)
         if response.get('error') is None:
             error_message = error_message + ' Make sure Ethereum node is synced.'
-            # When nodes are behind a load balancer it makes sense to retry the request in hopes it will go to other,
-            # synced node
+
             raise RetriableValueError(error_message)
         elif response.get('error') is not None:
             raise RetriableValueError(error_message)
