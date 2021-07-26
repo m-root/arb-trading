@@ -4,7 +4,7 @@
 pragma solidity ^0.5.0;
 
 /**
- * @dev Wrappers over Solidity's arithmetic operations with added overflow
+ * @dev wrappers over Solidity's arithmetic operations with added overflow
  * checks.
  *
  * Arithmetic operations in Solidity wrap on overflow. This can easily result
