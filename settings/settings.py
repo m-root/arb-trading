@@ -3,7 +3,7 @@ from web3 import Web3
 from decimal import Decimal
 
 # tx sender
-address_tx_sender = Web3.toChecksumAddress("own_address")
+address_tx_sender = Web3.toChecksumAddress("0x6faF2717448e79BfaCFeD9f1Be2B4A19b270c39a")
 
 # uniswap/sushi router
 address_router_contract = Web3.toChecksumAddress("0x7a250d5630b4cf539739df2c5dacb4c659f2488d")
@@ -77,7 +77,9 @@ gasPrice = 200*10**9    # 200 Gwei
 reserveMinAmount = 1e-20
 dfsUsePairNum = 200    # None=>all,or amount
 
-ethereum_http = "own_ethereum_node"
+# ethereum_http = "own_ethereum_node"
+ethereum_http = "https://35.74.80.62:8545"
+'''ec2-35-74-80-62.ap-northeast-1.compute.amazonaws.com'''
 
 class ProgramStatus(object):
     def __init__(self, running=True):
