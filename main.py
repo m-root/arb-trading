@@ -26,7 +26,7 @@ from utilities.tokens import getWhiteTokens
 from utilities.pairs import getAllPairInfo
 from utilities.log_builder import logger
 from utilities.abi.uniswap_router import abi as router_abi
-from core.contract_fun import estimateGas
+from core.contracts import estimateGas
 
 
 class JsonCustomEncoder(json.JSONEncoder):
