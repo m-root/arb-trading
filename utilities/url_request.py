@@ -1,6 +1,7 @@
 import requests
 import json
 import traceback
+from urllib3.util.connection import create_connection
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -28,6 +29,7 @@ def url_get(url):
 
 def url_websocket(earn_url):
     try:
+
         ws = create_connection(earn_url,timeout=5)
         if ws.connected:
             return True, ws.recv()
