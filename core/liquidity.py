@@ -6,8 +6,9 @@ from web3 import Web3
 from web3.datastructures import AttributeDict
 from typing import List, Dict, Callable
 
-from engine.events import get_reserves
+from utilities.requests import get_reserves
 from core.rpc import BatchHTTPProvider
+from settings.settings import web3_ins as web3_ins_
 
 from settings.settings import programStatus
 from settings.settings import timer
@@ -126,7 +127,7 @@ class Liquidity(threading.Thread):
         sync_topic = pair_abi.topic("Sync")
         while programStatus.running():
             try:
-                web3_ins = Web3(Web3.HTTPProvider(self.__eth_http))
+                web3_ins = web3_ins_
                 batch_provider = BatchHTTPProvider(self.__eth_http)
 
                 # update event from latest block

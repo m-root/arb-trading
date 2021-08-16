@@ -1,3 +1,4 @@
+import json
 import time
 from web3 import Web3
 from decimal import Decimal
@@ -8,8 +9,13 @@ address_tx_sender = Web3.toChecksumAddress("0x6faF2717448e79BfaCFeD9f1Be2B4A19b2
 # uniswap/sushi router
 address_router_contract = Web3.toChecksumAddress("0x7a250d5630b4cf539739df2c5dacb4c659f2488d")
 
+
 # uniswap/sushi factory
 address_factory_contract = Web3.toChecksumAddress("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
+
+
+pairABI = json.load(open('abi/IUniswapV2Pair.json'))['abi'] #todo
+erc20abi = json.load(open('./abi/erc20.abi')) #todo
 
 basicTokensAddress = {
     "weth": {
@@ -77,9 +83,16 @@ gasPrice = 200*10**9    # 200 Gwei
 reserveMinAmount = 1e-20
 dfsUsePairNum = 200    # None=>all,or amount
 
-# ethereum_http = "own_ethereum_node"
-ethereum_http = "https://35.74.80.62:8545"
-'''ec2-35-74-80-62.ap-northeast-1.compute.amazonaws.com'''
+
+ethereum_http = "http://127.0.0.1:8545"
+ethereum_ipc = "/Users/m-root/Library/Ethereum/geth.ipc"
+'''"http://3.112.70.171:8545"'''
+
+
+web3_ins = Web3(Web3.HTTPProvider(ethereum_http))
+# web3_ins = Web3(Web3.IPCProvider(ethereum_ipc))
+
+
 
 class ProgramStatus(object):
     def __init__(self, running=True):

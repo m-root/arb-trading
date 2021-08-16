@@ -12,7 +12,9 @@ from payload.dfs import findArb
 from core.liquidity import Liquidity
 from settings.settings import maxHops, startToken
 from settings.settings import minProfit
+from settings.settings import web3_ins
 from settings.settings import ethereum_http
+from settings.settings import ethereum_ipc
 from settings.settings import programStatus
 from settings.settings import timer
 from settings.settings import slidePoint
@@ -59,7 +61,7 @@ tokenOut = tokenIn
 
 tmr = timer()
 
-web3_ins = Web3(Web3.HTTPProvider(ethereum_http))
+web3_ins = web3_ins
 
 
 def main(pairs: List[Dict]) -> None:
@@ -152,6 +154,24 @@ if __name__ == "__main__":
 
     white_tokens = getWhiteTokens(redownload=options.redownload_tokens)
     all_pair_info = getAllPairInfo(
+        eth_http=ethereum_ipc,
+        redownload_pairinfo=options.redownload_pairs_info,
+        redownload_pairaddress=options.redownload_pairs_address,
+        programStatus=programStatus,
+    )
+
+    t = Liquidity(
+        eth_http=ethereum_http,
+        pairs=all_pair_info,
+        white_tokens=white_tokens,
+        reserve_min_amount=reserveMinAmount,
+        fallback_fun=main,
+    )
+    # print(white_tokens)
+    # print( t.start())
+
+
+    '''    all_pair_info = getAllPairInfo(
         eth_http=ethereum_http,
         redownload_pairinfo=options.redownload_pairs_info,
         redownload_pairaddress=options.redownload_pairs_address,
@@ -165,6 +185,10 @@ if __name__ == "__main__":
         reserve_min_amount=reserveMinAmount,
         fallback_fun=main,
     )
+    
+    
+    
+    '''
     t.start()
     t.join()
 

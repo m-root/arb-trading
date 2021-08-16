@@ -27,7 +27,8 @@ def get_allPairInfo(pairs_address:List[str], eth_http:str=None, batch_provider:B
 
     if eth_http:
         web3_ins = Web3(Web3.HTTPProvider(eth_http))
-        batch_provider = BatchHTTPProvider(eth_http)
+        batch_provider = BatchHTTPProvider('"http://127.0.0.1:8545"')
+        # batch_provider = BatchHTTPProvider(eth_http)
 
     tokens0 = []
     tokens1 = []
@@ -74,12 +75,17 @@ def get_allPairAddress(eth_http:str=None, batch_provider:BatchHTTPProvider=None,
 
 def get_reserves(web3_ins:Web3, batch_provider:BatchHTTPProvider, pairs:List[Dict], blockNumber:Union[int,str]='latest')->List[Dict]:
     r = list(generate_get_reserves_json_rpc(web3_ins, pairs, blockNumber))
+    # print(r)
+    # print(json.dumps(r))
     resp = batch_provider.make_batch_request(json.dumps(r))
+    print(resp)
     results = list(rpc_response_batch_to_results(resp))
     for i in range(len(results)):
         res = decode_abi(['uint256', 'uint256', 'uint256'], bytes.fromhex(results[i][2:]))
         pairs[i]['reserve0'] = res[0]
         pairs[i]['reserve1'] = res[1]
+
+    print(pairs)
     return pairs
 
 def get_receipts(batch_provider:BatchHTTPProvider, txhashes:List[str])->List[Dict]:
