@@ -77,9 +77,12 @@ class BatchHTTPProvider(HTTPProvider):
         self.logger.debug("Making request HTTP. URI: %s, Request: %s",
                           self.endpoint_uri, text)
         request_data = text.encode('utf-8')
+        print('----------------------------')
+        print(request_data)
+        print('-----------------------------')
 
         # print(self.get_request_kwargs())
-        print(type(request_data))
+        # print((request_data))
         raw_response = make_post_request(
             # self.endpoint_uri,
            "https://mainnet.infura.io/v3/3ccfb5a8cc7349239102c9600827044b",
