@@ -75,8 +75,6 @@ def get_allPairAddress(eth_http:str=None, batch_provider:BatchHTTPProvider=None,
 
 def get_reserves(web3_ins:Web3, batch_provider:BatchHTTPProvider, pairs:List[Dict], blockNumber:Union[int,str]='latest')->List[Dict]:
     r = list(generate_get_reserves_json_rpc(web3_ins, pairs, blockNumber))
-    # print(r)
-    # print(json.dumps(r))
     resp = batch_provider.make_batch_request(json.dumps(r))
     print(resp)
     results = list(rpc_response_batch_to_results(resp))
