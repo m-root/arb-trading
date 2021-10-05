@@ -89,8 +89,8 @@ ethereum_ipc = "/Users/m-root/Library/Ethereum/geth.ipc"
 '''"http://3.112.70.171:8545"'''
 
 
-web3_ins = Web3(Web3.HTTPProvider(ethereum_http))
-# web3_ins = Web3(Web3.IPCProvider(ethereum_ipc))
+
+web3_ins = Web3(Web3.IPCProvider(ethereum_ipc))
 
 
 

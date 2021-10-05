@@ -3,7 +3,6 @@ import time
 import signal
 import random
 import traceback
-from web3 import Web3
 from decimal import Decimal
 from optparse import OptionParser
 from typing import List, Dict, Union
